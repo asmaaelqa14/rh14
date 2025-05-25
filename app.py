@@ -23,11 +23,15 @@ jrg_code = {
     "Sales Executive": "Other", "Sales Representative": "Other"
 }
 
-# Classe pour ingénierie de features
+# Classe pour l'ingénierie des features
 class CombinedAttributesAdder(BaseEstimator, TransformerMixin):
-    def fit(self, X, y=None): return self
+    def fit(self, X, y=None):
+        return self
+
     def transform(self, X):
-        def encode(series, code): return pd.Series(series).map(code).values
+        def encode(series, code):
+            return pd.Series(series).map(code).values
+
         return np.c_[
             (X['Education'] == 2).values,
             (X['JobLevel'] == 2).values,
@@ -35,7 +39,7 @@ class CombinedAttributesAdder(BaseEstimator, TransformerMixin):
             (X['EnvironmentSatisfaction'] == 1).values,
             (X['WorkLifeBalance'] == 1).values,
             (X['Department'] == "Human Resources").values,
-            encode(X["JobSatisfaction"], {1: 1, 2: 2, 3: 2, 4: 3}),
+            pd.Series(X["JobSatisfaction"]).map({1: 1, 2: 2, 3: 2, 4: 3}).values,
             encode(X["EducationField"], efg_code),
             encode(X["JobRole"], jrg_code),
             ((X['MaritalStatus'] == 'Single') & (X["BusinessTravel"] != "Non-Travel")).values,
@@ -45,51 +49,62 @@ class CombinedAttributesAdder(BaseEstimator, TransformerMixin):
             ((X['Age'] <= 35) & (X["BusinessTravel"] != "Non-Travel")).values,
         ]
 
-# Fonction utilitaire pour chargement sécurisé
+# Fonction utilitaire pour charger les objets joblib
 def charger_joblib(fichier, nom_affichage):
     try:
         return joblib.load(fichier)
     except FileNotFoundError:
-        st.error(f"Le fichier {fichier} est introuvable. Veuillez le télécharger.")
+        st.error(f"Le fichier {fichier} est introuvable. Veuillez le télécharger sur GitHub.")
         st.stop()
     except Exception as e:
         st.error(f"Erreur lors du chargement de {nom_affichage} : {e}")
         st.stop()
 
-# Prétraitement utilisateur
+# Prétraitement des données utilisateur
 def preprocess_user_input(data):
     df = pd.DataFrame([data], columns=TOUTES_LES_COLONNES)
-    cont_processed = charger_joblib('imputer.joblib', 'imputer').transform(df[COLONNES_CONTINUES])
-    cont_scaled = charger_joblib('scaler.joblib', 'scaler').transform(cont_processed)
-    disc_encoded = charger_joblib('encoder_disc.joblib', 'encoder_disc').transform(df[COLONNES_CATEGORIELLES])
     
+    # Charger une seule fois les objets
+    imputer = charger_joblib('imputer.joblib', 'imputer')
+    scaler = charger_joblib('scaler.joblib', 'scaler')
+    encoder_disc = charger_joblib('encoder_disc.joblib', 'encoder_disc')
+    
+    # Traitement des variables continues
+    cont_processed = imputer.transform(df[COLONNES_CONTINUES])
+    cont_scaled = scaler.transform(cont_processed)
+    cont_scaled_df = pd.DataFrame(cont_scaled, columns=COLONNES_CONTINUES)
+    
+    # Traitement des variables catégorielles
+    disc_encoded = encoder_disc.transform(df[COLONNES_CATEGORIELLES])
+    disc_processed_df = pd.DataFrame(disc_encoded, 
+                                     columns=encoder_disc.get_feature_names_out(COLONNES_CATEGORIELLES))
+    
+    # Ingénierie des features additionnelles
     feat_eng_data = CombinedAttributesAdder().transform(df)
+    feat_eng_processed_df = pd.DataFrame(feat_eng_data, columns=[
+        'EducationIs2', 'JobLevelIs2', 'JobInvolvementIs1', 'EnvironmentSatisfactionIs1',
+        'WorkLifeBalanceIs1', 'DepartmentIsHumanResources', 'JobSatisfactionGrouped',
+        'EducationFieldGrouped', 'JobRoleGrouped', 'SingleAndTravelling',
+        'MarriedOnceAndTravelling', 'DoOvertime', 'IsYoungAndWorkedInManyCompanies',
+        'IsYoungAndTravel'
+    ])
     
-    df_final = pd.concat([
-        pd.DataFrame(disc_encoded, columns=charger_joblib('encoder_disc.joblib', 'encoder_disc').get_feature_names_out(COLONNES_CATEGORIELLES)),
-        pd.DataFrame(cont_scaled, columns=COLONNES_CONTINUES),
-        pd.DataFrame(feat_eng_data, columns=[
-            'EducationIs2', 'JobLevelIs2', 'JobInvolvementIs1', 'EnvironmentSatisfactionIs1',
-            'WorkLifeBalanceIs1', 'DepartmentIsHumanResources', 'JobSatisfactionGrouped',
-            'EducationFieldGrouped', 'JobRoleGrouped', 'SingleAndTravelling',
-            'MarriedOnceAndTravelling', 'DoOvertime', 'IsYoungAndWorkedInManyCompanies',
-            'IsYoungAndTravel'
-        ])
-    ], axis=1)
+    # Combinaison finale des features
+    processed_data = pd.concat([disc_processed_df, cont_scaled_df, feat_eng_processed_df], axis=1)
     
-    return df_final
+    return processed_data
 
-# Chargement des ressources
+# Chargement du modèle et des données de référence
 model = charger_joblib('modele_attrition.joblib', 'modèle')
 hr_df_loaded = charger_joblib('hr_df_for_streamlit_values.joblib', 'données de référence')
 
-# Interface utilisateur
+# Interface utilisateur Streamlit
 st.title("Prédiction de l'attrition des employés")
 st.write("Veuillez entrer les informations de l'employé pour prédire le risque d'attrition.")
 
 input_data = {}
 
-# Sélecteurs pour variables catégorielles avec valeurs pré-définies ou extraites
+# Options de sélection pour les variables catégorielles
 select_options = {
     "EducationField": ['Life Sciences', 'Other', 'Medical', 'Marketing', 'Technical Degree', 'Human Resources'],
     "BusinessTravel": ['Travel_Rarely', 'Travel_Frequently', 'Non-Travel'],
@@ -103,7 +118,7 @@ select_options = {
 for col, options in select_options.items():
     input_data[col] = st.selectbox(f"Sélectionnez {col}", options)
 
-# Champs numériques continus
+# Saisie des variables continues
 for col in COLONNES_CONTINUES:
     input_data[col] = st.number_input(
         f"Entrez {col}",
@@ -111,7 +126,7 @@ for col in COLONNES_CONTINUES:
         max_value=float(hr_df_loaded[col].max())
     )
 
-# Sliders pour les autres colonnes numériques discrètes
+# Sliders pour d'autres variables numériques discrètes
 slider_cols = {
     'Education': (1, 5),
     'JobLevel': (1, 5),
@@ -125,8 +140,17 @@ for col, (min_v, max_v) in slider_cols.items():
     default = int(hr_df_loaded[col].mode()[0]) if col in hr_df_loaded else min_v
     input_data[col] = st.slider(f"Sélectionnez {col}", min_value=min_v, max_value=max_v, value=default)
 
-# Prédiction
+# Bouton de prédiction
 if st.button("Prédire l'attrition"):
-    input_df = preprocess_user_input(input_data)
-    prediction = model.predict_proba(input_df)[0][1]  # probabilité d'attrition
-    st.success(f"Probabilité d'attrition : {prediction:.2%}")
+    try:
+        processed_input = preprocess_user_input(input_data)
+        # Prédiction de la probabilité d'attrition (classe 'Yes')
+        prediction_proba = model.predict_proba(processed_input)[0][1]
+        prediction_threshold = 0.5
+        prediction = "Oui" if prediction_proba >= prediction_threshold else "Non"
+
+        st.subheader("Résultat de la prédiction")
+        st.write(f"Probabilité d'attrition : {prediction_proba:.2f}")
+        st.write(f"Prédiction d'attrition (seuil > {prediction_threshold}) : **{prediction}**")
+    except Exception as e:
+        st.error(f"Erreur lors de la prédiction : {e}")
