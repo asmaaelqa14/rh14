@@ -164,11 +164,9 @@ except Exception as e:
     st.stop()
 
 input_data = {}
-# Mise à jour des selectbox avec les valeurs uniques exactes
-input_data["EducationField"] = st.selectbox("Sélectionnez EducationField", ['Life Sciences', 'Other', 'Medical', 'Marketing', 'Technical Degree', 'Human Resources'])
-input_data["BusinessTravel"] = st.selectbox("Sélectionnez BusinessTravel", ['Travel_Rarely', 'Travel_Frequently', 'Non-Travel'])
-input_data["EnvironmentSatisfaction"] = st.selectbox("Sélectionnez EnvironmentSatisfaction", [ 3.,  2.,  4.,  1., float('nan')]) # Inclure NaN si présent
-input_data["MaritalStatus"] = st.selectbox("Sélectionnez MaritalStatus", ['Married', 'Single', 'Divorced'])
+for col in COLONNES_CATEGORIELLES:
+    unique_values = hr_df_loaded[col].unique().tolist()
+    input_data[col] = st.selectbox(f"Sélectionnez {col}", unique_values)
 
 for col in COLONNES_CONTINUES:
     min_val = float(hr_df_loaded[col].min())
@@ -178,14 +176,14 @@ for col in COLONNES_CONTINUES:
 input_data['Education'] = st.slider("Niveau d'éducation", 1, 5, int(hr_df_loaded['Education'].mode()[0]) if 'Education' in hr_df_loaded else 3)
 input_data['JobLevel'] = st.slider("Niveau de poste", 1, 5, int(hr_df_loaded['JobLevel'].mode()[0]) if 'JobLevel' in hr_df_loaded else 2)
 input_data['JobInvolvement'] = st.slider("Implication au travail", 1, 4, int(hr_df_loaded['JobInvolvement'].mode()[0]) if 'JobInvolvement' in hr_df_loaded else 3)
-input_data['Department'] = st.selectbox("Département", ['Sales', 'Research & Development', 'Human Resources'])
+input_data['Department'] = st.selectbox("Département", hr_df_loaded['Department'].unique().tolist() if 'Department' in hr_df_loaded else [])
 input_data['JobSatisfaction'] = st.slider("Satisfaction au travail", 1, 4, int(hr_df_loaded['JobSatisfaction'].mode()[0]) if 'JobSatisfaction' in hr_df_loaded else 3)
-input_data['JobRole'] = st.selectbox("Rôle", ['Healthcare Representative', 'Research Scientist', 'Sales Executive', 'Human Resources', 'Research Director', 'Laboratory Technician', 'Manufacturing Director', 'Sales Representative', 'Manager'])
+input_data['JobRole'] = st.selectbox("Rôle", hr_df_loaded['JobRole'].unique().tolist() if 'JobRole' in hr_df_loaded else [])
 input_data['NumCompaniesWorked'] = st.slider("Nombre d'entreprises où il a travaillé", 0, int(hr_df_loaded['NumCompaniesWorked'].max()) if 'NumCompaniesWorked' in hr_df_loaded else 9, int(hr_df_loaded['NumCompaniesWorked'].mode()[0]) if 'NumCompaniesWorked' in hr_df_loaded else 1)
 input_data['WorkLifeBalance'] = st.slider("Équilibre vie privée/vie pro", 1, 4, int(hr_df_loaded['WorkLifeBalance'].mode()[0]) if 'WorkLifeBalance' in hr_df_loaded else 3)
 input_data['meanPresenceTime'] = st.number_input("Temps de présence moyen (en heures)", min_value=0.0, max_value=24.0, value=8.0)
-input_data['MaritalStatus'] = st.selectbox("Statut marital", ['Married', 'Single', 'Divorced'])
-input_data['BusinessTravel'] = st.selectbox("Fréquence des voyages d'affaires", ['Travel_Rarely', 'Travel_Frequently', 'Non-Travel'])
+input_data['MaritalStatus'] = st.selectbox("Statut marital", hr_df_loaded['MaritalStatus'].unique().tolist() if 'MaritalStatus' in hr_df_loaded else [])
+input_data['BusinessTravel'] = st.selectbox("Fréquence des voyages d'affaires", hr_df_loaded['BusinessTravel'].unique().tolist() if 'BusinessTravel' in hr_df_loaded else [])
 input_data['Age'] = st.number_input("Âge", min_value=18, max_value=100, value=30)
 
 if st.button("Prédire l'attrition"):
