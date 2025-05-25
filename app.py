@@ -1,156 +1,92 @@
 import streamlit as st
-import joblib
-import pandas as pd
+import pickle
 import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
 
-# Définition des colonnes
-COLONNES_CATEGORIELLES = ["EducationField", "BusinessTravel", "EnvironmentSatisfaction", "MaritalStatus"]
-COLONNES_CONTINUES = ["Age", "TotalWorkingYears", "YearsAtCompany", "YearsWithCurrManager", "meanPresenceTime"]
-AUTRES_COLONNES = ['Education', 'JobLevel', 'JobInvolvement', 'Department', 'JobSatisfaction', 'JobRole', 'NumCompaniesWorked', 'WorkLifeBalance']
-TOUTES_LES_COLONNES = COLONNES_CATEGORIELLES + COLONNES_CONTINUES + AUTRES_COLONNES
+# Chargement du modèle entraîné
+with open('model.pkl', 'rb') as file:
+    model = pickle.load(file)
 
-# Codes groupés
-efg_code = {
-    "Life Sciences": "Other", "Human Resources": "Human Resources ",
-    "Marketing": "Other", "Technical Degree": "Technical Degree",
-    "Other": "Other", "Medical": "Other"
-}
-jrg_code = {
-    "Healthcare Representative": "Other", "Laboratory Technician": "Other",
-    "Human Resources": "Other", "Manager": "Other", "Manufacturing Director": "Manufacturing Director",
-    "Research Director": "Research Director", "Research Scientist": "Other",
-    "Sales Executive": "Other", "Sales Representative": "Other"
-}
+st.title("Prédiction de la fidélité des employés")
 
-# Classe pour l'ingénierie des features
-class CombinedAttributesAdder(BaseEstimator, TransformerMixin):
-    def fit(self, X, y=None):
-        return self
+st.write("Remplissez les informations ci-dessous :")
 
-    def transform(self, X):
-        def encode(series, code):
-            return pd.Series(series).map(code).values
+# Inputs utilisateur
+age = st.number_input("Âge", min_value=18, max_value=60, value=30)
+distance_from_home = st.number_input("Distance du domicile (km)", min_value=1, max_value=30, value=5)
+education = st.selectbox("Niveau d'éducation", [1, 2, 3, 4, 5])
+job_level = st.selectbox("Niveau de poste", [1, 2, 3, 4, 5])
+monthly_income = st.number_input("Salaire mensuel", min_value=1000, max_value=200000, value=50000)
+num_companies_worked = st.selectbox("Nombre d'entreprises précédentes", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+percent_salary_hike = st.selectbox("Augmentation de salaire (%)", [11, 12, 13, 14, 15, 17, 20, 21, 22, 23])
+total_working_years = st.number_input("Années totales d'expérience", min_value=0, max_value=40, value=5)
+training_times_last_year = st.selectbox("Formations suivies l'année dernière", [0, 1, 2, 3, 4, 5, 6])
+years_at_company = st.number_input("Années dans l'entreprise", min_value=0, max_value=40, value=3)
+years_since_last_promotion = st.selectbox("Années depuis la dernière promotion", [0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11])
+years_with_curr_manager = st.selectbox("Années avec le manager actuel", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13])
+job_involvement = st.selectbox("Implication au travail", [1, 2, 3, 4])
+performance_rating = st.selectbox("Évaluation de performance", [3, 4])
+environment_satisfaction = st.selectbox("Satisfaction environnementale", [1, 2, 3, 4])
+job_satisfaction = st.selectbox("Satisfaction professionnelle", [1, 2, 3, 4])
+work_life_balance = st.selectbox("Équilibre vie pro/perso", [1, 2, 3, 4])
+stock_option_level = st.selectbox("Niveau d'options d'achat d'actions", [0, 1, 2, 3])
+mean_start_time = st.number_input("Heure moyenne d'arrivée", min_value=5.0, max_value=12.0, value=9.9)
+mean_leave_time = st.number_input("Heure moyenne de départ", min_value=13.0, max_value=22.0, value=17.0)
+mean_presence_time = st.number_input("Temps de présence moyen", min_value=4.0, max_value=12.0, value=7.5)
+number_of_absence_day = st.selectbox("Nombre de jours d'absence", list(range(0, 25)))
+number_of_presence_day = st.selectbox("Nombre de jours de présence", list(range(200, 251)))
 
-        return np.c_[
-            (X['Education'] == 2).values,
-            (X['JobLevel'] == 2).values,
-            (X['JobInvolvement'] == 1).values,
-            (X['EnvironmentSatisfaction'] == 1).values,
-            (X['WorkLifeBalance'] == 1).values,
-            (X['Department'] == "Human Resources").values,
-            pd.Series(X["JobSatisfaction"]).map({1: 1, 2: 2, 3: 2, 4: 3}).values,
-            encode(X["EducationField"], efg_code),
-            encode(X["JobRole"], jrg_code),
-            ((X['MaritalStatus'] == 'Single') & (X["BusinessTravel"] != "Non-Travel")).values,
-            ((X['MaritalStatus'] != 'Single') & (X["BusinessTravel"] != "Non-Travel")).values,
-            (X['meanPresenceTime'] > 8).values,
-            ((X['Age'] <= 35) & (X['NumCompaniesWorked'] > 3)).values,
-            ((X['Age'] <= 35) & (X["BusinessTravel"] != "Non-Travel")).values,
-        ]
+# Catégorielles
+business_travel = st.selectbox("Fréquence de voyage professionnel", 
+                               ['Travel_Rarely', 'Travel_Frequently', 'Non-Travel'])
+department = st.selectbox("Département", 
+                          ['Sales', 'Research & Development', 'Human Resources'])
+education_field = st.selectbox("Domaine d'éducation", 
+                               ['Life Sciences', 'Other', 'Medical', 'Marketing', 'Technical Degree', 'Human Resources'])
+gender = st.selectbox("Genre", ['Female', 'Male'])
+job_role = st.selectbox("Poste", 
+                        ['Healthcare Representative', 'Research Scientist', 'Sales Executive',
+                         'Human Resources', 'Research Director', 'Laboratory Technician',
+                         'Manufacturing Director', 'Sales Representative', 'Manager'])
+marital_status = st.selectbox("État civil", ['Married', 'Single', 'Divorced'])
 
-# Fonction utilitaire pour charger les objets joblib
-def charger_joblib(fichier, nom_affichage):
-    try:
-        return joblib.load(fichier)
-    except FileNotFoundError:
-        st.error(f"Le fichier {fichier} est introuvable. Veuillez le télécharger sur GitHub.")
-        st.stop()
-    except Exception as e:
-        st.error(f"Erreur lors du chargement de {nom_affichage} : {e}")
-        st.stop()
-
-# Prétraitement des données utilisateur
-def preprocess_user_input(data):
-    df = pd.DataFrame([data], columns=TOUTES_LES_COLONNES)
-    
-    # Charger une seule fois les objets
-    imputer = charger_joblib('imputer.joblib', 'imputer')
-    scaler = charger_joblib('scaler.joblib', 'scaler')
-    encoder_disc = charger_joblib('encoder_disc.joblib', 'encoder_disc')
-    
-    # Traitement des variables continues
-    cont_processed = imputer.transform(df[COLONNES_CONTINUES])
-    cont_scaled = scaler.transform(cont_processed)
-    cont_scaled_df = pd.DataFrame(cont_scaled, columns=COLONNES_CONTINUES)
-    
-    # Traitement des variables catégorielles
-    disc_encoded = encoder_disc.transform(df[COLONNES_CATEGORIELLES])
-    disc_processed_df = pd.DataFrame(disc_encoded, 
-                                     columns=encoder_disc.get_feature_names_out(COLONNES_CATEGORIELLES))
-    
-    # Ingénierie des features additionnelles
-    feat_eng_data = CombinedAttributesAdder().transform(df)
-    feat_eng_processed_df = pd.DataFrame(feat_eng_data, columns=[
-        'EducationIs2', 'JobLevelIs2', 'JobInvolvementIs1', 'EnvironmentSatisfactionIs1',
-        'WorkLifeBalanceIs1', 'DepartmentIsHumanResources', 'JobSatisfactionGrouped',
-        'EducationFieldGrouped', 'JobRoleGrouped', 'SingleAndTravelling',
-        'MarriedOnceAndTravelling', 'DoOvertime', 'IsYoungAndWorkedInManyCompanies',
-        'IsYoungAndTravel'
-    ])
-    
-    # Combinaison finale des features
-    processed_data = pd.concat([disc_processed_df, cont_scaled_df, feat_eng_processed_df], axis=1)
-    
-    return processed_data
-
-# Chargement du modèle et des données de référence
-model = charger_joblib('modele_attrition.joblib', 'modèle')
-hr_df_loaded = charger_joblib('hr_df_for_streamlit_values.joblib', 'données de référence')
-
-# Interface utilisateur Streamlit
-st.title("Prédiction de l'attrition des employés")
-st.write("Veuillez entrer les informations de l'employé pour prédire le risque d'attrition.")
-
-input_data = {}
-
-# Options de sélection pour les variables catégorielles
-select_options = {
-    "EducationField": ['Life Sciences', 'Other', 'Medical', 'Marketing', 'Technical Degree', 'Human Resources'],
-    "BusinessTravel": ['Travel_Rarely', 'Travel_Frequently', 'Non-Travel'],
-    "EnvironmentSatisfaction": [3.0, 2.0, 4.0, 1.0, float('nan')],
-    "MaritalStatus": ['Married', 'Single', 'Divorced'],
-    "Department": ['Sales', 'Research & Development', 'Human Resources'],
-    "JobRole": ['Healthcare Representative', 'Research Scientist', 'Sales Executive', 'Human Resources',
-                'Research Director', 'Laboratory Technician', 'Manufacturing Director', 'Sales Representative', 'Manager']
+# Construction de l'entrée
+input_data = {
+    'Age': age,
+    'DistanceFromHome': distance_from_home,
+    'Education': education,
+    'JobLevel': job_level,
+    'MonthlyIncome': monthly_income,
+    'NumCompaniesWorked': num_companies_worked,
+    'PercentSalaryHike': percent_salary_hike,
+    'TotalWorkingYears': total_working_years,
+    'TrainingTimesLastYear': training_times_last_year,
+    'YearsAtCompany': years_at_company,
+    'YearsSinceLastPromotion': years_since_last_promotion,
+    'YearsWithCurrManager': years_with_curr_manager,
+    'JobInvolvement': job_involvement,
+    'PerformanceRating': performance_rating,
+    'EnvironmentSatisfaction': environment_satisfaction,
+    'JobSatisfaction': job_satisfaction,
+    'WorkLifeBalance': work_life_balance,
+    'StockOptionLevel': stock_option_level,
+    'meanStartTime': mean_start_time,
+    'meanLeaveTime': mean_leave_time,
+    'meanPresenceTime': mean_presence_time,
+    'numberOfAbsenceDay': number_of_absence_day,
+    'numberOfPresenceDay': number_of_presence_day,
+    'BusinessTravel': business_travel,
+    'Department': department,
+    'EducationField': education_field,
+    'Gender': gender,
+    'JobRole': job_role,
+    'MaritalStatus': marital_status
 }
 
-for col, options in select_options.items():
-    input_data[col] = st.selectbox(f"Sélectionnez {col}", options)
+# Encodage si pipeline avec OneHotEncoder ou autre
+import pandas as pd
+input_df = pd.DataFrame([input_data])
 
-# Saisie des variables continues
-for col in COLONNES_CONTINUES:
-    input_data[col] = st.number_input(
-        f"Entrez {col}",
-        min_value=float(hr_df_loaded[col].min()),
-        max_value=float(hr_df_loaded[col].max())
-    )
+if st.button("Prédire"):
+    prediction = model.predict(input_df)
+    st.success(f"Résultat de la prédiction : {prediction[0]}")
 
-# Sliders pour d'autres variables numériques discrètes
-slider_cols = {
-    'Education': (1, 5),
-    'JobLevel': (1, 5),
-    'JobInvolvement': (1, 4),
-    'JobSatisfaction': (1, 4),
-    'WorkLifeBalance': (1, 4),
-    'NumCompaniesWorked': (0, int(hr_df_loaded['NumCompaniesWorked'].max()))
-}
-
-for col, (min_v, max_v) in slider_cols.items():
-    default = int(hr_df_loaded[col].mode()[0]) if col in hr_df_loaded else min_v
-    input_data[col] = st.slider(f"Sélectionnez {col}", min_value=min_v, max_value=max_v, value=default)
-
-# Bouton de prédiction
-if st.button("Prédire l'attrition"):
-    try:
-        processed_input = preprocess_user_input(input_data)
-        # Prédiction de la probabilité d'attrition (classe 'Yes')
-        prediction_proba = model.predict_proba(processed_input)[0][1]
-        prediction_threshold = 0.5
-        prediction = "Oui" if prediction_proba >= prediction_threshold else "Non"
-
-        st.subheader("Résultat de la prédiction")
-        st.write(f"Probabilité d'attrition : {prediction_proba:.2f}")
-        st.write(f"Prédiction d'attrition (seuil > {prediction_threshold}) : **{prediction}**")
-    except Exception as e:
-        st.error(f"Erreur lors de la prédiction : {e}")
